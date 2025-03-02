@@ -22,7 +22,9 @@
 2. 右键点击`compile.ps1`，选择"使用PowerShell运行"
 
 ## 依赖要求
-- Python 3.x
+- 使用 winget 安装 Pandoc: 
+    `winget install JohnMacFarlane.Pandoc`
+- Python 3.x （在 Python 3.12.9 测试通过）
 - Nuitka (会自动安装)
 - Visual Studio 2022 (用于MSVC编译器)
 
