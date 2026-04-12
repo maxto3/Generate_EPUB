@@ -1,0 +1,9 @@
+css: style.css
+epub-cover-image: D:/Downloads/升邪.webp
+epub-subdirectory: ''
+epub-title-page: false
+from: markdown
+metadata-file: meta.yaml
+output-file: 豆子惹的祸-升邪.epub
+split-level: 2
+to: epub2

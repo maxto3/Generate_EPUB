@@ -163,11 +163,27 @@ class SettingsGUI(ttk.Window):
 
             # 从文件名提取书名和作者信息（可选）
             filename = Path(self.input_file).stem
-            pattern = r"《(?P<title>[^》]+)》(?P<rest>.*)作者：(?P<author>.+)"
-            match = re.search(pattern, filename)
-            if match:
-                title = match.group("title")
-                author = match.group("author")
+            # 模式 1: 《书名》...作者：作者名
+            pattern1 = r"《(?P<title>[^》]+)》(?P<rest>.*)作者：(?P<author>.+)"
+            # 模式 2: 作者-书名
+            pattern2 = r"^(?P<author>[^-]+)-(?P<title>.+)$"
+
+            match1 = re.search(pattern1, filename)
+            match2 = re.search(pattern2, filename)
+
+            if match1:
+                title = match1.group("title").strip()
+                author = match1.group("author").strip()
+                self.title_var.set(title)
+                self.author_var.set(author)
+                show_message(
+                    "提示",
+                    f"已从文件名自动填充：书名《{title}》，作者：{author}",
+                    status_bar=self.status_bar,
+                )
+            elif match2:
+                title = match2.group("title").strip()
+                author = match2.group("author").strip()
                 self.title_var.set(title)
                 self.author_var.set(author)
                 show_message(
