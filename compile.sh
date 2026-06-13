@@ -15,7 +15,7 @@ SCRIPT_PATH="generate_epub.py"
 NUITKA_OPTIONS=(
     "--standalone"
     "--onefile"
-    "--enable-plugin=tk-inter"
+    "--enable-plugin=pyside6"
     "--output-dir=build"
     "--linux-icon=icon.ico"
     #"--static-libpython=no"

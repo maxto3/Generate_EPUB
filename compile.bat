@@ -8,7 +8,7 @@ REM 设置 Python 脚本路径
 set SCRIPT_PATH=generate_epub.py
 
 REM 设置 Nuitka 编译选项
-set NUITKA_OPTIONS=--standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=tk-inter --output-dir=build --msvc=latest
+set NUITKA_OPTIONS=--standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=pyside6 --output-dir=build --msvc=latest
 
 REM 检查 Nuitka 是否安装
 python -m nuitka --version >nul 2>&1

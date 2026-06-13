@@ -10,7 +10,7 @@ $NUITKA_OPTIONS = @(
     "--onefile", 
     "--windows-console-mode=disable",
     "--windows-icon-from-ico=icon.ico",
-    "--enable-plugin=tk-inter",
+    "--enable-plugin=pyside6",
     "--output-dir=build",
     "--msvc=latest"
 )
