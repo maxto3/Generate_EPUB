@@ -204,7 +204,7 @@ class SettingsGUI(QMainWindow):
         self.title_edit = QLineEdit()
         metadata_layout.addWidget(self.title_edit, 1, 1)
 
-        metadata_layout.addWidget(QLabel("描述:"), 2, 0, Qt.AlignTop)
+        metadata_layout.addWidget(QLabel("描述:"), 2, 0, Qt.AlignmentFlag.AlignTop)
         self.description_edit = QTextEdit()
         self.description_edit.setMaximumHeight(120)
         metadata_layout.addWidget(self.description_edit, 2, 1)
@@ -510,7 +510,10 @@ class SettingsGUI(QMainWindow):
         output_file = f"{author}-{title}.epub"
 
         self._pandoc_process = QProcess()
-        self._pandoc_process.setProcessChannelMode(QProcess.MergedChannels)
+        # stdout/stderr 合并读取，避免管道阻塞；错误输出统一从标准输出获取
+        self._pandoc_process.setProcessChannelMode(
+            QProcess.ProcessChannelMode.MergedChannels
+        )
 
         self._pandoc_process.finished.connect(
             lambda exit_code, _: self._on_pandoc_done(exit_code, output_file)
@@ -527,7 +530,11 @@ class SettingsGUI(QMainWindow):
             if self.enable_logging:
                 logging.info(f"EPUB生成成功: {output_file}")
         else:
-            err_output = str(self._pandoc_process.readAllStandardError(), "utf-8")
+            # MergedChannels 模式下 stderr 已并入标准输出，需从 stdout 读取
+            err_output = (
+                bytes(self._pandoc_process.readAllStandardOutput().data())
+                .decode("utf-8", errors="replace")
+            )
             self.status_bar.showMessage(f"EPUB生成失败: {err_output}")
             QMessageBox.critical(self, "失败", f"EPUB生成失败！错误消息：{err_output}")
             if self.enable_logging:
