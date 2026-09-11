@@ -8,9 +8,7 @@ REM 设置 Python 脚本路径
 set SCRIPT_PATH=generate_epub.py
 
 REM 设置 Nuitka 编译选项
-REM --include-package-data=ttkbootstrap 用于打包 ttkbootstrap 的主题与图标资源，
-REM 否则运行时会报 FileNotFoundError: ttkbootstrap/assets/icons/bootstrap.ttf
-set NUITKA_OPTIONS=--standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=tk-inter --include-package-data=ttkbootstrap --output-dir=build --msvc=latest
+set NUITKA_OPTIONS=--standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=pyside6 --output-dir=build --msvc=latest
 
 REM 检查 Nuitka 是否安装
 python -m nuitka --version >nul 2>&1
