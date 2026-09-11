@@ -6,7 +6,7 @@
 
 ### Key Technologies
 - **Python 3.12+**: Main logic and GUI.
-- **ttkbootstrap**: Modernized Tkinter-based user interface.
+- **PySide6 (Qt)**: Desktop GUI; preprocessing runs on a `QThread`, Pandoc is launched asynchronously via `QProcess`.
 - **Pandoc**: Backend engine for Markdown to EPUB conversion.
 - **Nuitka**: Compilation tool to bundle the Python script into a single `.exe` (for Windows).
 - **PyYAML**: For managing metadata (`meta.yaml`) and Pandoc configurations (`pandocconfig.yaml`).
@@ -23,7 +23,7 @@
 3. **Visual Studio 2022**: Required for the MSVC compiler (Nuitka dependency).
 4. **Python Dependencies**:
    ```bash
-   pip install ttkbootstrap pyyaml chardet nuitka
+   pip install PySide6 pyyaml chardet nuitka
    ```
 
 ### Key Commands
@@ -42,7 +42,7 @@ The project provides several scripts for compilation using Nuitka:
 
 The compilation command used is:
 ```bash
-python -m nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=tk-inter --output-dir=build --msvc=latest generate_epub.py
+python -m nuitka --standalone --onefile --windows-console-mode=disable --windows-icon-from-ico=icon.ico --enable-plugin=pyside6 --output-dir=build --msvc=latest generate_epub.py
 ```
 Output executable will be located in the `build/` directory.
 
@@ -74,8 +74,8 @@ Input `.txt` files are preprocessed automatically by `epub_preprocess.py`:
 > Regression rule of thumb: never widen heading detection to "starts with 卷/第". Always require an explicit numeric index plus a boundary, otherwise prose such as `卷牍室比杨狱想象的要大，也更热闹。` gets promoted to a heading again.
 
 ### Code Style
-- **GUI**: Follows `ttkbootstrap` patterns for theming.
-- **Error Handling**: Uses `messagebox` and a status bar for user feedback.
+- **GUI**: Built with PySide6/Qt widgets (`QMainWindow`, signals/slots); preprocessing runs in a background `QThread` and Pandoc in `QProcess`, so the UI stays responsive.
+- **Error Handling**: Uses `QMessageBox` and the status bar for user feedback.
 - **Logging**: Supports optional logging to `epub_generator.log` for debugging conversion issues.
 - **Surgical Preprocessing**: The preprocessing module cleans common "web novel" artifacts (ad banners, URLs, HTML-entity watermarks, excessive dividers) and normalizes headings using regex, then hands the markdown to Pandoc.
 
@@ -84,4 +84,4 @@ Input `.txt` files are preprocessed automatically by `epub_preprocess.py`:
 ## TODO / Future Enhancements
 - [ ] Add support for multiple CSS templates.
 - [ ] Implement batch conversion for multiple TXT files.
-- [ ] Add a progress bar for long-running Pandoc tasks.
+- [x] Add a progress bar for long-running Pandoc tasks (implemented in the Qt GUI).

@@ -8,6 +8,7 @@
 - 支持封面图片选择（支持webp/jpg/png格式）
 - 自动生成必要的配置文件（meta.yaml, pandocconfig.yaml, style.css）
 - 使用Pandoc进行EPUB格式转换
+- 后台线程预处理 + 异步转换，界面在转换期间保持响应并显示进度条（PySide6/Qt）
 - 可选日志记录功能
 - 支持中文内容处理
 - 提供友好的错误提示和状态显示
@@ -29,6 +30,7 @@
 - 使用 winget 安装 Pandoc:  
     `winget install JohnMacFarlane.Pandoc`
 - Python 3.x （在 Python 3.12.9 测试通过）
+- PySide6（Qt 界面框架；缺失时脚本会自动安装）
 - Nuitka (会自动安装)
 - Visual Studio 2022 (用于MSVC编译器)
 
@@ -38,7 +40,7 @@
 
 ## 注意事项
 
-- 首次运行会自动安装Nuitka
+- 首次运行会自动安装缺失的 Python 依赖（PySide6、PyYAML、chardet）；编译脚本会自动安装Nuitka
 - 需要Visual Studio 2022的MSVC编译器
 - 编译过程可能需要几分钟时间
 
