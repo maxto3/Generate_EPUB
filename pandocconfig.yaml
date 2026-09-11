@@ -1,9 +1,9 @@
 css: style.css
-epub-cover-image: D:/Downloads/升邪.webp
+epub-cover-image: D:/Downloads/诸界第一因.webp
 epub-subdirectory: ''
 epub-title-page: false
 from: markdown
 metadata-file: meta.yaml
-output-file: 豆子惹的祸-升邪.epub
+output-file: 裴屠狗-诸界第一因.epub
 split-level: 2
 to: epub2

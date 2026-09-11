@@ -2,30 +2,105 @@
 #!/usr/bin/env python3
 
 """
-注意：作为输入的文本文件需要做一些简单处理。要求如下：
-1. 文件编码需要设置为utf-8
-2. 文章章节比如“内容简介”、“第一章” 之类的需要添加markdown语法的# （注意# 后面的空格）。例如“# 内容简介”、“# 第一章”。如果有分卷（第一卷之类的），那么就把卷设置为标题1（Header 1），把章设置为标题2（Header2)。对应的卷就是 “# 第一卷”，章节就是“## 第一章”。注意# 需要英文半角字符而不能是中文全角字符。
-3. 章节/卷之后需要添加一行空行
-4. 每个段落之后需要添加一空行
-5. 段落/标题开头不能有任何空白字符比如空格或者中文全角空格字符。
+本程序把「网文 txt」转换为 EPUB：自动探测编码、清洗广告行、识别卷/章标题，然后调用 pandoc 生成 epub。
 
-以上的要求在vim编辑器或者支持正则表达式的编辑器都很容易做到。
+文本预处理由 ``epub_preprocess.py`` 自动完成，以下事项不再需要手工处理：
 
-现在脚本已经可以自动按照上面的步骤预处理文本文件了。
+1. 编码：自动探测（chardet + gb18030/gbk/big5/utf-16 兜底），无需事先转成 UTF-8；
+2. 标题：自动识别 ``第X卷`` / ``卷X``（卷，Header 1）与 ``第X章`` / ``第X回``（章；
+   有分卷时为 Header 2，无分卷时为 Header 1），并自动补 ``#`` / ``##`` 前缀；
+3. 空行：标题前后、段落之间自动补空行；行首行尾的空白（含中文全角空格 U+3000）自动清除；
+4. 广告：``====`` 分隔线、网址、HTML 实体水印等噪声行自动删除。
 
+仍然可以手工干预：**已经带 ``#`` / ``##`` 前缀的行会原样保留**，可用于修正自动识别不到的特殊标题
+（例如不带编号的卷名写法）。
+
+命令行自查（不启动 GUI）::
+
+    python epub_preprocess.py <小说.txt> --dry-run --list-headings
 """
 
 import logging
 import re
 import subprocess
+import sys
 from datetime import datetime
 from glob import glob
 from pathlib import Path
 from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 
-import chardet
+
+# 第三方依赖：模块导入名 -> pip 安装包名
+REQUIRED_PACKAGES = {
+    "chardet": "chardet",
+    "ttkbootstrap": "ttkbootstrap",
+    "yaml": "PyYAML",
+}
+
+
+def _module_available(module):
+    try:
+        __import__(module)
+        return True
+    except ImportError:
+        return False
+
+
+def _is_bundled():
+    """判断是否运行在编译打包（Nuitka/PyInstaller）后的可执行程序中。"""
+    if getattr(sys, "frozen", False):
+        return True
+    try:
+        import builtins
+
+        if getattr(builtins, "__compiled__", False):
+            return True
+    except Exception:
+        pass
+    return bool(globals().get("__compiled__", False))
+
+
+def ensure_dependencies():
+    """自动安装当前 Python 环境缺失的第三方依赖模块。
+
+    通过 sys.executable 调用 pip，保证模块安装进当前正在使用的虚拟环境，
+    然后再由下方代码完成导入。
+    """
+    # 编译打包后依赖已内嵌，无需（也不应）联网自动安装
+    if _is_bundled():
+        return
+
+    missing = [
+        REQUIRED_PACKAGES[module]
+        for module in REQUIRED_PACKAGES
+        if not _module_available(module)
+    ]
+    if not missing:
+        return
+
+    print(f"检测到缺少依赖模块: {', '.join(missing)}，正在自动安装 ...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"自动安装依赖失败，请手动执行:\n"
+            f"    {sys.executable} -m pip install {' '.join(missing)}"
+        )
+        raise SystemExit(f"缺少必要依赖: {', '.join(missing)}") from e
+
+    # 安装完成后复查，确保全部可用
+    for module in REQUIRED_PACKAGES:
+        if not _module_available(module):
+            raise SystemExit(f"依赖 {module} 安装后仍无法导入，请手动检查环境")
+
+
+# 在导入第三方模块之前，先确保依赖已安装
+ensure_dependencies()
+
 import ttkbootstrap as ttk
 import yaml
+
+from epub_preprocess import decode_bytes, preprocess_text
 
 
 def show_message(title, message, is_error=False, status_bar=None):
@@ -194,110 +269,14 @@ class SettingsGUI(ttk.Window):
 
             # 预处理文本文件
             try:
-                # 读取文件并检测编码
                 with open(self.input_file, "rb") as f:
                     raw_data = f.read()
-                    detected = chardet.detect(raw_data)
-                    detected_encoding = detected["encoding"]
-                    confidence = detected["confidence"]
 
-                    if self.enable_logging.get():
-                        logging.info(
-                            f"检测到文件编码: {detected_encoding} (置信度: {confidence})"
-                        )
-
-                # 尝试读取内容并转换为UTF-8
-                try:
-                    content = (
-                        raw_data.decode(detected_encoding)
-                        .encode("utf-8")
-                        .decode("utf-8")
-                    )
-                except UnicodeDecodeError as e:
-                    # 如果检测的编码失败，尝试常见的中文编码
-                    for encoding in ["gb18030", "gbk", "big5", "utf-16"]:
-                        try:
-                            content = (
-                                raw_data.decode(encoding)
-                                .encode("utf-8")
-                                .decode("utf-8")
-                            )
-                            if self.enable_logging.get():
-                                logging.info(f"使用备用编码 {encoding} 成功解码文件")
-                            break
-                        except UnicodeDecodeError:
-                            continue
-                    else:
-                        if self.enable_logging.get():
-                            logging.error(f"无法解码文件: {str(e)}")
-                        raise
-
-                # 处理章节标题和段落格式
-                lines = content.splitlines()
-                processed_lines = []
-                has_volume = False
-
-                # 首先清理每行空白字符（包括中文全角空格）
-                lines = [
-                    re.sub(r"^[\s\u3000]+|[\s\u3000]+$", "", line)
-                    for line in content.splitlines()
-                ]
-
-                # 删除广告分隔线和网址
-                cleaned_lines = []
-                skip_next = False
-                for line in lines:
-                    if re.match(r"^={10,}", line):  # 匹配10个或更多等号
-                        continue
-                    if re.match(r"^更多精校小说尽在", line):
-                        continue
-                    if re.match(r"^www\.", line):
-                        continue
-                    cleaned_lines.append(line)
-
-                # 然后处理段落格式
-                content = "\n".join(cleaned_lines)
-                content = re.sub(r"\n(\S)", r"\n\n\1", content)
-                lines = content.splitlines()
-
-                for line in lines:
-                    # 处理卷、章、引子等标题
-                    if re.match(r"^(第.{1,2}卷|卷.{1,2}\s)", line):
-                        has_volume = True
-                        # 删除标题前面多余的空行
-                        while processed_lines and processed_lines[-1] == "":
-                            processed_lines.pop()
-                        # 确保标题前面有一个空行
-                        if processed_lines:
-                            processed_lines.append("")
-                        processed_lines.append(f"# {line}")
-                        # 确保标题后面有一个空行
-                        processed_lines.append("")
-                    elif re.match(r"^第.+章", line):
-                        # 删除标题前面多余的空行
-                        while processed_lines and processed_lines[-1] == "":
-                            processed_lines.pop()
-                        # 确保标题前面有一个空行
-                        if processed_lines:
-                            processed_lines.append("")
-                        if has_volume:
-                            processed_lines.append(f"## {line}")
-                        else:
-                            processed_lines.append(f"# {line}")
-                        # 确保标题后面有一个空行
-                        processed_lines.append("")
-                    elif re.match(r"^(内容简介|简介|引子)[:：]?", line):
-                        # 删除标题前面多余的空行
-                        while processed_lines and processed_lines[-1] == "":
-                            processed_lines.pop()
-                        # 确保标题前面有一个空行
-                        if processed_lines:
-                            processed_lines.append("")
-                        processed_lines.append(f"# {line}")
-                        # 确保标题后面有一个空行
-                        processed_lines.append("")
-                    else:
-                        processed_lines.append(line)
+                # 编码探测 + 文本清洗 + 卷/章标题识别（统一由 epub_preprocess 处理）
+                content, used_encoding = decode_bytes(raw_data)
+                if self.enable_logging.get():
+                    logging.info(f"使用编码 {used_encoding} 解码文件")
+                result = preprocess_text(content)
 
                 # 保存预处理后的文件
                 preprocessed_file = str(
@@ -306,13 +285,16 @@ class SettingsGUI(ttk.Window):
                     )
                 )
                 with open(preprocessed_file, "w", encoding="utf-8") as f:
-                    f.write("\n".join(processed_lines))
+                    f.write(result.markdown)
 
                 # 更新输入文件为预处理后的文件
                 self.input_file = preprocessed_file
+                stats = result.stats
                 show_message(
                     "成功",
-                    f"文件已预处理并保存为: {preprocessed_file}",
+                    f"文件已预处理并保存为: {preprocessed_file}\n"
+                    f"识别卷 {stats['volumes']} 个、章 {stats['chapters']} 个、"
+                    f"简介/序 {stats['intros']} 个，过滤广告 {stats['ads_removed']} 行",
                     status_bar=self.status_bar,
                 )
 
@@ -475,14 +457,20 @@ class SettingsGUI(ttk.Window):
 
             pandoc_command = ["pandoc", "--defaults=pandocconfig.yaml", input_file]
 
-            # 根据操作系统设置subprocess参数
-            kwargs = {"capture_output": True, "text": True}
+            # Windows 下隐藏转换时弹出的控制台窗口，其余系统无需额外参数
             import platform
 
             if platform.system() == "Windows":
-                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-
-            process = subprocess.run(pandoc_command, **kwargs)
+                process = subprocess.run(
+                    pandoc_command,
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            else:
+                process = subprocess.run(
+                    pandoc_command, capture_output=True, text=True
+                )
 
             if process.returncode == 0:
                 show_message("成功", "epub生成成功！", status_bar=self.status_bar)

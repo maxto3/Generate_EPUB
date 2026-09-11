@@ -16,6 +16,9 @@ NUITKA_OPTIONS=(
     "--standalone"
     "--onefile"
     "--enable-plugin=tk-inter"
+    # ttkbootstrap 的主题与图标（ttkbootstrap/assets/**）必须显式打包，
+    # 否则运行时会报 FileNotFoundError: ttkbootstrap/assets/icons/bootstrap.ttf
+    "--include-package-data=ttkbootstrap"
     "--output-dir=build"
     "--linux-icon=icon.ico"
     #"--static-libpython=no"
